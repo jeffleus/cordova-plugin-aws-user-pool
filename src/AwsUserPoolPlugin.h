@@ -1,8 +1,8 @@
 #import <Cordova/CDV.h>
 
-#import "AWSCognitoIdentityProvider.h"
+#import <AWSCognitoIdentityProvider/AWSCognitoIdentityProvider.h>
 #import <AWSCognito/AWSCognito.h>
-#import <AWSLambda/AWSLambda.h>
+//#import <AWSLambda/AWSLambda.h>
 
 #import <Foundation/Foundation.h>
 
@@ -12,7 +12,7 @@
 // #import <Configuration.h>
 
 // load API classes for accessing endpoints
-#import "BYMAPPV3BYMAPPClient.h"
+//#import "BYMAPPV3BYMAPPClient.h"
 
 
 	@interface AwsUserPoolPlugin : CDVPlugin
@@ -41,7 +41,7 @@
 	- (void)createAWSCognitoDataset:(CDVInvokedUrlCommand*) command;
 	- (void)getUserDataCognitoSync:(CDVInvokedUrlCommand*) command;
     - (void)setUserDataCognitoSync:(CDVInvokedUrlCommand*) command;
-    - (void)callAWSLambdaFunction:(CDVInvokedUrlCommand*) command;
+    - (void)getToken:(CDVInvokedUrlCommand*) command;
 
 	@end
 

@@ -40,7 +40,25 @@
 
     @implementation AwsUserPoolPlugin
 
-	AWSRegionType const CognitoIdentityUserPoolRegion = AWSRegionEUWest1;
+	AWSRegionType const CognitoIdentityUserPoolRegion = AWSRegionUSWest2;
+
+
+- (void)getToken:(CDVInvokedUrlCommand *)command {
+    
+    [[self.Pool token] continueWithBlock:^id _Nullable(AWSTask<NSString *> * _Nonnull task) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:task.result];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return nil;
+    }];
+    
+//    [[[self.Pool currentUser] getSession]
+//            continueWithSuccessBlock:^id _Nullable(AWSTask<AWSCognitoIdentityUserSession *> * _Nonnull task) {
+//                
+//                CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:task.result.idToken.tokenString];
+//                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+//                return nil;
+//            }];
+}
 
     - (void)init:(CDVInvokedUrlCommand*)command{
         [AWSDDLog sharedInstance].logLevel = AWSDDLogLevelVerbose;
@@ -74,8 +92,8 @@
         AWSServiceConfiguration *configuration = [[AWSServiceConfiguration alloc] initWithRegion:CognitoIdentityUserPoolRegion credentialsProvider:self.credentialsProvider];
         [AWSServiceManager defaultServiceManager].defaultServiceConfiguration = configuration;
         
-        // Not generic BYMAPPV3BYMAPPClient is something from my application
-        [BYMAPPV3BYMAPPClient registerClientWithConfiguration:configuration forKey:@"EUWest1BYMAPPV3BYMAPPClient"];
+//        // Not generic BYMAPPV3BYMAPPClient is something from my application
+//        [BYMAPPV3BYMAPPClient registerClientWithConfiguration:configuration forKey:@"EUWest1BYMAPPV3BYMAPPClient"];
 
         //self.syncClient = [AWSCognito defaultCognito];
         [AWSCognito registerCognitoWithConfiguration:configuration forKey:@"CognitoSync"];
@@ -512,42 +530,4 @@
         }
     }
 
-    - (void)callAWSLambdaFunction:(CDVInvokedUrlCommand*) command {
-        /*
-        // Not generic yet, only work for me.
-        // Need to find a way to call function from the aws linked file
-        */
-
-        NSMutableDictionary* options = [command.arguments objectAtIndex:0];
-
-        NSString *username = [options objectForKey:@"username"];
-
-        BYMAPPV3User *user = [[BYMAPPV3User alloc] init];
-        user.userName = username;
-
-        BYMAPPV3BYMAPPClient *apiInstance = [BYMAPPV3BYMAPPClient clientForKey:@"EUWest1BYMAPPV3BYMAPPClient"];
-
-        [[apiInstance userapiUserPost:user] continueWithBlock:^id(AWSTask *task) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if(task.error) {
-                    NSLog(@"error : %@", task.error);
-                    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:task.error.userInfo];
-                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                } else {
-                    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"Ok"];
-                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                }
-            });
-            return nil;
-        }];
-    }
-
     @end
-
-
-
-
-
-
-
-
