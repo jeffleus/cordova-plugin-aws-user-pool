@@ -11,6 +11,16 @@ var AwsUserPoolPlugin = function(config, successCallback, errorCallback) {
 		errorCallback(error);
 	}, "AwsUserPoolPlugin", "init", [config]);
 };
+  
+//added to allow getting a fresh token each time it is needed...DONT KNOW IF THIS IS BEST PRACTICE???
+AwsUserPoolPlugin.prototype.getToken = function(config, successCallback, errorCallback) {
+cordova.exec(function(params) {
+            successCallback(params);
+            },
+            function(error) {
+            errorCallback(error);
+            }, "AwsUserPoolPlugin", "getToken", [config]);
+};
 
 AwsUserPoolPlugin.prototype.signIn = function(config, successCallback, errorCallback) {
 	cordova.exec(function(params) {
