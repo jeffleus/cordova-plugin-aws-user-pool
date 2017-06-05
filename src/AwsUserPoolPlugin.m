@@ -1,4 +1,5 @@
 #import "AwsUserPoolPlugin.h"
+#import "CognitoPoolIdentityProvider.h"
 
     @implementation MyManager
 
@@ -25,6 +26,7 @@
 
     @end
 
+/**
     @implementation AWSCognitoIdentityUserPool (UserPoolsAdditions)
 
     - (AWSTask<NSString *> *)token {        
@@ -37,57 +39,194 @@
     }
 
     @end
+**/
 
     @implementation AwsUserPoolPlugin
+        //hard-coded region constant for the USWest2 region based on current project
+        AWSRegionType const CognitoIdentityUserPoolRegion = AWSRegionUSWest2;
 
-	AWSRegionType const CognitoIdentityUserPoolRegion = AWSRegionEUWest1;
+        //Config options for the AWS Cognito services to use my identityPool, userPool, and clientId
+        NSString *CognitoIdentityUserPoolId;
+        NSString *CognitoIdentityUserPoolAppClientId;
+        NSString *CognitoIdentityUserPoolAppClientSecret;
+        NSString *CognitoIdentityPoolId;
+        //hard-coded for now, but need to include in config args from teh plugin calls
+        NSString *USER_POOL_NAME = @"FuelStationApp";
+        NSString *CognitoIdentityUserPoolRegionString = @"us-west-2";
+
+        //AWS Objects to handle the service interactions
+        AWSCognitoIdentityUserPool *pool;
+        AWSCognitoIdentityUser *user;
+        AWSCognitoIdentityUserPoolConfiguration *configuration;
+        AWSServiceConfiguration *serviceConfiguration;
+        AWSCognitoCredentialsProvider *credentialsProvider;
+
+        AWSServiceConfiguration *serviceConfig;
 
     - (void)init:(CDVInvokedUrlCommand*)command{
+        //add the aws loggin in verbose mode for the development process
         [AWSDDLog sharedInstance].logLevel = AWSDDLogLevelVerbose;
         [AWSDDLog addLogger:[AWSDDTTYLogger sharedInstance]];
 
+        //grab the configuration options from the plugin command args at the first index
         NSMutableDictionary* options = [command.arguments objectAtIndex:0];
+        [self readOptions:options];
 
-		self.CognitoIdentityUserPoolId = [options objectForKey:@"CognitoIdentityUserPoolId"];
-		self.CognitoIdentityUserPoolAppClientId = [options objectForKey:@"CognitoIdentityUserPoolAppClientId"];
-		self.CognitoIdentityUserPoolAppClientSecret = [options objectForKey:@"CognitoIdentityUserPoolAppClientSecret"];
-        if(!self.CognitoIdentityUserPoolAppClientSecret || [self.CognitoIdentityUserPoolAppClientSecret isKindOfClass:[NSNull class]]
-            || self.CognitoIdentityUserPoolAppClientSecret.length)
-            self.CognitoIdentityUserPoolAppClientSecret = nil;
-        self.User = nil;
-        self.actualAccessToken = nil;
-        self.arnIdentityPoolId = [options objectForKey:@"arnIdentityPoolId"];
-        self.dataset = nil;
-
-        self.credentialsProvider = nil;
-
-        AWSServiceConfiguration *serviceConfiguration = [[AWSServiceConfiguration alloc] initWithRegion:CognitoIdentityUserPoolRegion credentialsProvider:nil];
-
-        AWSCognitoIdentityUserPoolConfiguration *userPoolConfiguration = [[AWSCognitoIdentityUserPoolConfiguration alloc] initWithClientId:self.CognitoIdentityUserPoolAppClientId clientSecret:self.CognitoIdentityUserPoolAppClientSecret poolId:self.CognitoIdentityUserPoolId];
-
-        [AWSCognitoIdentityUserPool registerCognitoIdentityUserPoolWithConfiguration:serviceConfiguration userPoolConfiguration:userPoolConfiguration forKey:@"UserPool"];
-
-        self.Pool = [AWSCognitoIdentityUserPool CognitoIdentityUserPoolForKey:@"UserPool"];
-
-        self.credentialsProvider = [[AWSCognitoCredentialsProvider alloc] initWithRegionType:CognitoIdentityUserPoolRegion identityPoolId:self.arnIdentityPoolId identityProviderManager:self.Pool];
-
-        AWSServiceConfiguration *configuration = [[AWSServiceConfiguration alloc] initWithRegion:CognitoIdentityUserPoolRegion credentialsProvider:self.credentialsProvider];
-        [AWSServiceManager defaultServiceManager].defaultServiceConfiguration = configuration;
         
-        // Not generic BYMAPPV3BYMAPPClient is something from my application
-        [BYMAPPV3BYMAPPClient registerClientWithConfiguration:configuration forKey:@"EUWest1BYMAPPV3BYMAPPClient"];
+        // We can then set this as the default configuration for all AWS SDKs
+        serviceConfiguration = [[AWSServiceConfiguration alloc] initWithRegion:CognitoIdentityUserPoolRegion credentialsProvider:nil];
+        
+        // Setup the pool
+        configuration = [[AWSCognitoIdentityUserPoolConfiguration alloc]
+                         initWithClientId:CognitoIdentityUserPoolAppClientId
+                         clientSecret:CognitoIdentityUserPoolAppClientSecret
+                         poolId:CognitoIdentityUserPoolId];
+        //register the pool using the serviceConfig and poolConfig for the given poolName as key
+        [AWSCognitoIdentityUserPool registerCognitoIdentityUserPoolWithConfiguration:serviceConfiguration
+                                                               userPoolConfiguration:configuration
+                                                                              forKey:USER_POOL_NAME];
+        // Get the pool object now
+        pool = [AWSCognitoIdentityUserPool CognitoIdentityUserPoolForKey:USER_POOL_NAME];
+        
+        // The Credentials Provider holds our identity pool which allows access to AWS resources
+        credentialsProvider = [[AWSCognitoCredentialsProvider alloc]
+                               initWithRegionType:CognitoIdentityUserPoolRegion
+                               identityPoolId:CognitoIdentityPoolId
+                               identityProviderManager:pool];
+        
+        //init a new serviceConfig this time providing the credentialsProvider
+        AWSServiceConfiguration *svcConfig = [[AWSServiceConfiguration alloc]
+                                              initWithRegion:CognitoIdentityUserPoolRegion
+                                              credentialsProvider:credentialsProvider];
+        [AWSServiceManager defaultServiceManager].defaultServiceConfiguration = svcConfig;
+        
 
-        //self.syncClient = [AWSCognito defaultCognito];
-        [AWSCognito registerCognitoWithConfiguration:configuration forKey:@"CognitoSync"];
-        MyManager *sharedManager = [MyManager sharedManager];
-
-        sharedManager.lastUsername = @"";
-        sharedManager.lastPassword = @"";
-
-        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"Initialization successful"];
-
+        //create a pluginResult to report back the init results and return to the command delegate
+        CDVPluginResult *pluginResult = [CDVPluginResult
+                                         resultWithStatus:CDVCommandStatus_OK
+                                         messageAsString:@"Initialization successful"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
+
+- (void)readOptions:(NSDictionary *)options {
+    
+    CognitoIdentityPoolId = [options objectForKey:@"arnIdentityPoolId"];
+    CognitoIdentityUserPoolId = [options objectForKey:@"CognitoIdentityUserPoolId"];
+    CognitoIdentityUserPoolAppClientId = [options objectForKey:@"CognitoIdentityUserPoolAppClientId"];
+    //I do not use the Client Secret in my configurations
+    CognitoIdentityUserPoolAppClientSecret = nil;
+    
+}
+
+- (void)loginUser:(CDVInvokedUrlCommand*)command {
+    // Get the user from the pool
+    NSMutableDictionary* options = [command.arguments objectAtIndex:0];
+    
+    NSString *username = [options objectForKey:@"username"];
+    NSString *password = [options objectForKey:@"password"];
+    //    user = [pool currentUser];
+    user = [pool getUser:username];
+    
+    // Make a call to get hold of the users session
+    [[user getSession:username password:password validationData:nil]
+     continueWithBlock:^id _Nullable(AWSTask<AWSCognitoIdentityUserSession *> * _Nullable task) {
+         if (task.error) {
+             NSLog(@"Could not get user session. Error: %@", task.error);
+             
+             // Create a pluginResult with the taskError and return to the calling pluginCommand
+             CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:task.error.userInfo];
+             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+         } else {
+             NSLog(@"Successfully retrieved user session data");
+             
+             // Get the session object from our result
+             AWSCognitoIdentityUserSession *session = (AWSCognitoIdentityUserSession *) task.result;
+             NSLog(@"ID TOKEN: %@", session.idToken.tokenString);
+             
+             // Build a token string
+             NSString *key = [NSString
+                              stringWithFormat:@"cognito-idp.%@.amazonaws.com/%@",
+                              CognitoIdentityUserPoolRegionString,
+                              CognitoIdentityUserPoolId];
+             NSString *tokenStr = [session.idToken tokenString];
+             NSDictionary *tokens = [[NSDictionary alloc] initWithObjectsAndKeys:tokenStr, key,  nil];
+             
+             CognitoPoolIdentityProvider *idProvider = [[CognitoPoolIdentityProvider alloc] init];
+             [idProvider addTokens:tokens];
+             
+             AWSCognitoCredentialsProvider *creds = [[AWSCognitoCredentialsProvider alloc]
+                                                     initWithRegionType:CognitoIdentityUserPoolRegion
+                                                     identityPoolId:CognitoIdentityPoolId
+                                                     identityProviderManager:idProvider];
+             
+             serviceConfig = [[AWSServiceConfiguration alloc]
+                              initWithRegion:CognitoIdentityUserPoolRegion
+                              credentialsProvider:creds];
+             
+             // This sets the default service configuration to allow the API gateway access to user authentication
+             AWSServiceManager.defaultServiceManager.defaultServiceConfiguration = serviceConfig;
+             
+             // Register the pool
+             [AWSCognitoIdentityUserPool
+              registerCognitoIdentityUserPoolWithConfiguration:serviceConfig
+              userPoolConfiguration:configuration
+              forKey:USER_POOL_NAME];
+             
+             // Create a pluginResult with the userSession and return to the JS layer w/ the plugins commandCallback
+             CDVPluginResult *pluginResult = [CDVPluginResult
+                                              resultWithStatus:CDVCommandStatus_OK
+                                              messageAsDictionary:task.result];
+             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+         }
+         return nil;
+     }];
+}
+
+- (void)refreshSession:(CDVInvokedUrlCommand*)command {
+    
+    // Get the user from the pool
+    user = [pool currentUser];
+    // Get the session for the current user and refresh if needed...
+    [[user getSession] continueWithBlock:^id _Nullable(AWSTask<AWSCognitoIdentityUserSession *> * _Nonnull task) {
+        if (task.error) {
+            NSLog(@"There was an error refreshing session...");
+            NSLog(@"\n\n**********\nPlease Login Again\n\n**********\n");
+            // Create a pluginResult with the taskError and return to the calling pluginCommand
+            CDVPluginResult *pluginResult = [CDVPluginResult
+                                             resultWithStatus:CDVCommandStatus_ERROR
+                                             messageAsDictionary:task.error.userInfo];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            
+        } else {
+            NSLog(@"\n\n**********\nSession was refreshed!!! Yay!!!\n\n**********\n");
+            NSLog(@"\nEXPIRES: %@", task.result.expirationTime);
+            NSLog(@"\n\nTOKEN: %@\n\n", task.result.idToken.tokenString);
+            
+            // Create a pluginResult with the userSession and return to the JS layer w/ the plugins commandCallback
+            CDVPluginResult *pluginResult = [CDVPluginResult
+                                             resultWithStatus:CDVCommandStatus_OK
+                                             messageAsDictionary:task.result];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            
+        }
+        return nil;
+    }];
+    
+}
+
+- (void)logout:(CDVInvokedUrlCommand*)command {
+    
+    // Get the user from the pool, signOut and clear the keychain of refresh tokens, etc.
+    user = [pool currentUser];
+    [user signOut];
+    [credentialsProvider clearKeychain];
+    
+    CDVPluginResult *pluginResult = [CDVPluginResult
+                                     resultWithStatus:CDVCommandStatus_OK
+                                     messageAsString:@"SignOut successful"];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    
+}
 
     - (void)offlineSignIn:(CDVInvokedUrlCommand*)command {
         /*
@@ -382,17 +521,6 @@
 
         AWSCognito *syncClient = [AWSCognito CognitoForKey:@"CognitoSync"];
 
-        if ([[Reachability reachabilityForInternetConnection]currentReachabilityStatus] == NotReachable) {
-            self.dataset = [syncClient openOrCreateDataset:idString];
-
-            self.dataset.conflictHandler = ^AWSCognitoResolvedConflict* (NSString *datasetName, AWSCognitoConflict *conflict) {
-                // override and always choose remote changes
-                return [conflict resolveWithRemoteRecord];
-            };
-            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"NetworkingError"];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }
-        else {
             [[syncClient refreshDatasetMetadata] continueWithBlock:^id(AWSTask *task) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (task.error){
@@ -409,11 +537,6 @@
                             return [conflict resolveWithRemoteRecord];
                         };
                         
-                        if ([[Reachability reachabilityForInternetConnection]currentReachabilityStatus] == NotReachable) {
-                            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"NetworkingError"];
-                            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                        }
-                        else {
                             [[self.dataset synchronize] continueWithBlock:^id(AWSTask *task) {
                                 dispatch_async(dispatch_get_main_queue(), ^{
                                     if (task.isCancelled) {
@@ -433,12 +556,10 @@
                                 });
                                 return nil;
                             }];
-                        }
                     }
                 });
                 return nil;
             }];
-        }
     }
 
 
@@ -451,12 +572,6 @@
         NSLog(@"getUserDataCognitoSync, value : %@", value);
         NSLog(@"getUserDataCognitoSync, keyString: %@", keyString);
 
-        if ([[Reachability reachabilityForInternetConnection]currentReachabilityStatus] == NotReachable) {
-            NSLog(@"getUserDataCognitoSync failed NetworkingError");
-            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:value];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }
-        else {
             [[self.dataset synchronize] continueWithBlock:^id(AWSTask *task) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (task.isCancelled) {
@@ -476,7 +591,6 @@
                 });
                 return nil;
             }];
-        }
     }
 
     - (void) setUserDataCognitoSync:(CDVInvokedUrlCommand *) command {
@@ -487,11 +601,6 @@
         NSString *valueString = [options objectForKey:@"value"];
 
         [self.dataset setString:valueString forKey:keyString];
-        if ([[Reachability reachabilityForInternetConnection]currentReachabilityStatus] == NotReachable) {
-            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"NetworkingError, data saved localy"];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }
-        else {
             [[self.dataset synchronize] continueWithBlock:^id(AWSTask *task) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (task.isCancelled) {
@@ -509,37 +618,6 @@
                 });
                 return nil;
             }];
-        }
-    }
-
-    - (void)callAWSLambdaFunction:(CDVInvokedUrlCommand*) command {
-        /*
-        // Not generic yet, only work for me.
-        // Need to find a way to call function from the aws linked file
-        */
-
-        NSMutableDictionary* options = [command.arguments objectAtIndex:0];
-
-        NSString *username = [options objectForKey:@"username"];
-
-        BYMAPPV3User *user = [[BYMAPPV3User alloc] init];
-        user.userName = username;
-
-        BYMAPPV3BYMAPPClient *apiInstance = [BYMAPPV3BYMAPPClient clientForKey:@"EUWest1BYMAPPV3BYMAPPClient"];
-
-        [[apiInstance userapiUserPost:user] continueWithBlock:^id(AWSTask *task) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if(task.error) {
-                    NSLog(@"error : %@", task.error);
-                    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:task.error.userInfo];
-                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                } else {
-                    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"Ok"];
-                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                }
-            });
-            return nil;
-        }];
     }
 
     @end

@@ -1,18 +1,13 @@
 #import <Cordova/CDV.h>
 
-#import "AWSCognitoIdentityProvider.h"
+#import <AWSCognitoIdentityProvider/AWSCognitoIdentityProvider.h>
 #import <AWSCognito/AWSCognito.h>
-#import <AWSLambda/AWSLambda.h>
 
 #import <Foundation/Foundation.h>
 
-#import "Reachability.h"
 
 // #import <ApiClient.h>
 // #import <Configuration.h>
-
-// load API classes for accessing endpoints
-#import "BYMAPPV3BYMAPPClient.h"
 
 
 	@interface AwsUserPoolPlugin : CDVPlugin
