@@ -38,6 +38,10 @@
     - (void)setUserDataCognitoSync:(CDVInvokedUrlCommand*) command;
     - (void)getToken:(CDVInvokedUrlCommand*) command;
 
+	- (void)loginUser:(CDVInvokedUrlCommand*)command;
+	- (void)logout:(CDVInvokedUrlCommand*)command;
+	- (void)refreshSession:(CDVInvokedUrlCommand*)command;
+
 	@end
 
 	@interface AWSCognitoIdentityUserPool (UserPoolsAdditions)

@@ -11,15 +11,43 @@ var AwsUserPoolPlugin = function(config, successCallback, errorCallback) {
 		errorCallback(error);
 	}, "AwsUserPoolPlugin", "init", [config]);
 };
+
+
+AwsUserPoolPlugin.prototype.login = function(config, successCallback, errorCallback) {
+	cordova.exec(function(params) {
+		successCallback(params);
+	},
+	function(error) {
+		errorCallback(error);
+	}, "AwsUserPoolPlugin", "loginUser", [config]);
+};
+
+AwsUserPoolPlugin.prototype.logout = function(config, successCallback, errorCallback) {
+	cordova.exec(function(params) {
+		successCallback(params);
+	},
+	function(error) {
+		errorCallback(error);
+	}, "AwsUserPoolPlugin", "loginUser", [config]);
+};
+
+AwsUserPoolPlugin.prototype.signIn = function(config, successCallback, errorCallback) {
+	cordova.exec(function(params) {
+		successCallback(params);
+	},
+	function(error) {
+		errorCallback(error);
+	}, "AwsUserPoolPlugin", "logout", [config]);
+};
   
 //added to allow getting a fresh token each time it is needed...DONT KNOW IF THIS IS BEST PRACTICE???
 AwsUserPoolPlugin.prototype.getToken = function(config, successCallback, errorCallback) {
-cordova.exec(function(params) {
-            successCallback(params);
-            },
-            function(error) {
-            errorCallback(error);
-            }, "AwsUserPoolPlugin", "getToken", [config]);
+	cordova.exec(function(params) {
+		successCallback(params);
+	},
+	function(error) {
+		errorCallback(error);
+	}, "AwsUserPoolPlugin", "refreshSession", [config]);
 };
 
 AwsUserPoolPlugin.prototype.signIn = function(config, successCallback, errorCallback) {

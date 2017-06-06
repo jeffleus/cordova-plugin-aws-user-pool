@@ -175,7 +175,7 @@
              // Create a pluginResult with the userSession and return to the JS layer w/ the plugins commandCallback
              CDVPluginResult *pluginResult = [CDVPluginResult
                                               resultWithStatus:CDVCommandStatus_OK
-                                              messageAsDictionary:task.result];
+                                              messageAsDictionary:[task.result.idToken tokenString]];
              [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
          }
          return nil;
@@ -201,11 +201,16 @@
             NSLog(@"\n\n**********\nSession was refreshed!!! Yay!!!\n\n**********\n");
             NSLog(@"\nEXPIRES: %@", task.result.expirationTime);
             NSLog(@"\n\nTOKEN: %@\n\n", task.result.idToken.tokenString);
+			
+            NSMutableDictionary *session = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                            [task.result.idToken tokenString], @"idToken",
+                                            [task.result.accessToken tokenString], @"accessToken",
+                                            [task.result.refreshToken tokenString], @"refreshToken", nil];
             
             // Create a pluginResult with the userSession and return to the JS layer w/ the plugins commandCallback
             CDVPluginResult *pluginResult = [CDVPluginResult
                                              resultWithStatus:CDVCommandStatus_OK
-                                             messageAsDictionary:task.result];
+                                             messageAsDictionary:session];
             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
             
         }
