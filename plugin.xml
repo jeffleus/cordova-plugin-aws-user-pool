@@ -20,6 +20,7 @@
 		</config-file>
 
 	    <framework src="SystemConfiguration.framework" weak="true" />
+		<!-- frameworks -->
 
         <header-file src="src/AwsUserPoolPlugin.h" />
         <header-file src="src/CognitoPoolIdentityProvider.h" />
